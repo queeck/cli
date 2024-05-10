@@ -35,7 +35,7 @@ jobs:
         with:
           fail_ci_if_error: true
           files: ./coverage.txt
-          token: ${{ secrets.CODECOV_API_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
   test-goos:
