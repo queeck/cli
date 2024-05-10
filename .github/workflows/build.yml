@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Golang dependencies to /vendor
-        uses: make vendor
+        run: make vendor
 
       - name: Building
-        uses: make build
+        run: make build
