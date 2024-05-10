@@ -1,0 +1,29 @@
+name: Lint
+
+on: [push]
+
+jobs:
+  lint:
+    strategy:
+      matrix:
+        go_versions: [1.22.x]
+        platform: [ubuntu-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go_versions }}
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v5
+        with:
+          version: latest
+          # Optional: show only new issues if it's a pull request. The default value is `false`.
+          only-new-issues: true
