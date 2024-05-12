@@ -11,6 +11,7 @@ import (
 	hiera "github.com/queeck/cli/internal/services/commands/hierarchy"
 	modelRoot "github.com/queeck/cli/internal/services/commands/models"
 	modelConfig "github.com/queeck/cli/internal/services/commands/models/config"
+	modelConfigGet "github.com/queeck/cli/internal/services/commands/models/config/get"
 	modelConfigView "github.com/queeck/cli/internal/services/commands/models/config/view"
 	serviceConfig "github.com/queeck/cli/internal/services/config"
 	serviceDirectory "github.com/queeck/cli/internal/services/directory"
@@ -47,9 +48,8 @@ func run() error {
 		modelRoot.New,
 		hiera.Node(
 			modelConfig.New,
-			hiera.Node(
-				modelConfigView.New,
-			),
+			hiera.Node(modelConfigView.New),
+			hiera.Node(modelConfigGet.New),
 		),
 	)
 

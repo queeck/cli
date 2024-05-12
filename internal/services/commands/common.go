@@ -3,17 +3,21 @@ package commands
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/queeck/cli/internal/models"
 	"github.com/queeck/cli/internal/pkg/cli"
 	"github.com/queeck/cli/internal/services/config"
 	"github.com/queeck/cli/internal/services/state"
 	"github.com/queeck/cli/internal/services/templates"
 )
 
+type Variant struct {
+	Code        string
+	Description string
+}
+
 type Command interface {
 	tea.Model
 	Code() string
-	Commands() []models.Command
+	Commands() []Variant
 }
 
 // Bus is common interface for all commands.

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path"
+	"slices"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -16,10 +17,11 @@ const (
 )
 
 type Config interface {
-	Get(path string) any
-	GetString(path string) string
+	Get(path string) (value any, has bool)
+	GetString(path string) (value string, has bool)
 	Set(path string, value any) error
 	View() string
+	Keys() []string
 	Path() string
 }
 
@@ -51,12 +53,24 @@ func (c *config) Save() error {
 	return os.WriteFile(filePath, c.data, serviceDirectory.Permissions)
 }
 
-func (c *config) Get(path string) any {
-	return gjson.ParseBytes(c.data).Get(path).Value()
+func (c *config) get(path string) gjson.Result {
+	return gjson.ParseBytes(c.data).Get(path)
 }
 
-func (c *config) GetString(path string) string {
-	return gjson.ParseBytes(c.data).Get(path).String()
+func (c *config) Get(path string) (any, bool) {
+	result := c.get(path)
+	if !result.Exists() {
+		return nil, false
+	}
+	return result.Value(), true
+}
+
+func (c *config) GetString(path string) (string, bool) {
+	result := c.get(path)
+	if !result.Exists() {
+		return "", false
+	}
+	return result.String(), true
 }
 
 func (c *config) Set(path string, value any) error {
@@ -72,6 +86,12 @@ func (c *config) Path() string {
 	return c.path
 }
 
+func (c *config) Keys() []string {
+	list := keys(c.data)
+	slices.Sort(list)
+	return list
+}
+
 func (c *config) View() string {
-	return View(c.data)
+	return view(c.data)
 }

@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/queeck/cli/internal/models"
 	"github.com/queeck/cli/internal/pkg/keymaps"
 	"github.com/queeck/cli/internal/services/commands"
 )
@@ -19,11 +18,11 @@ const (
 	Code = "view"
 )
 
-var _ commands.Command = &ConfigView{} // check for interface compatibility
+var _ commands.Command = &Model{} // check for interface compatibility
 
-type ConfigView struct {
+type Model struct {
 	bus      commands.Bus
-	keys     keymaps.ViewportKeyMap
+	keymap   keymaps.ViewportKeymap
 	help     help.Model
 	viewport viewport.Model
 	view     string
@@ -34,28 +33,28 @@ type ConfigView struct {
 }
 
 func New(bus commands.Bus) commands.Command {
-	return &ConfigView{
-		view:  bus.Config().View(),
-		keys:  keymaps.Viewport(),
-		help:  help.New(),
-		bus:   bus,
-		ready: false,
+	return &Model{
+		bus:    bus,
+		keymap: keymaps.Viewport(),
+		help:   help.New(),
+		view:   bus.Config().View(),
+		ready:  false,
 	}
 }
 
-func (m *ConfigView) Code() string {
+func (m *Model) Code() string {
 	return Code
 }
 
-func (m *ConfigView) Commands() []models.Command {
+func (m *Model) Commands() []commands.Variant {
 	return nil
 }
 
-func (m *ConfigView) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *ConfigView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -67,13 +66,13 @@ func (m *ConfigView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.Left):
-			return m.bus.CommandConfig(), nil
-		case key.Matches(msg, m.keys.Help):
+		case key.Matches(msg, m.keymap.Left):
+			return m.bus.Parent(m), nil
+		case key.Matches(msg, m.keymap.Help):
 			m.help.ShowAll = !m.help.ShowAll
 			m.ready = false
 			m.sync()
-		case key.Matches(msg, m.keys.Quit):
+		case key.Matches(msg, m.keymap.Quit):
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -84,7 +83,7 @@ func (m *ConfigView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmd)
 }
 
-func (m *ConfigView) View() string {
+func (m *Model) View() string {
 	if m.quitting {
 		return m.bus.Templates().RenderCommonQuit()
 	}
@@ -95,7 +94,7 @@ func (m *ConfigView) View() string {
 	return fmt.Sprintf("%s\n%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView(), m.helpView())
 }
 
-func (m *ConfigView) sync() {
+func (m *Model) sync() {
 	headerHeight := lipgloss.Height(m.headerView())
 	footerHeight := lipgloss.Height(m.footerView())
 	helpHeight := lipgloss.Height(m.helpView())
@@ -120,18 +119,18 @@ func (m *ConfigView) sync() {
 	}
 }
 
-func (m *ConfigView) headerView() string {
+func (m *Model) headerView() string {
 	title := styleTitle().Render("Config: " + m.bus.Config().Path())
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }
 
-func (m *ConfigView) footerView() string {
+func (m *Model) footerView() string {
 	info := styleInfo().Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100)) //nolint:mnd // not a magic number
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
 }
 
-func (m *ConfigView) helpView() string {
-	return m.help.View(m.keys)
+func (m *Model) helpView() string {
+	return m.help.View(m.keymap)
 }

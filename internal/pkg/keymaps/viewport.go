@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 )
 
-type ViewportKeyMap struct {
+type ViewportKeymap struct {
 	viewport.KeyMap
 	Left key.Binding
 	Help key.Binding
@@ -14,13 +14,13 @@ type ViewportKeyMap struct {
 
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
-func (v ViewportKeyMap) ShortHelp() []key.Binding {
+func (v ViewportKeymap) ShortHelp() []key.Binding {
 	return []key.Binding{v.Help, v.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
 // key.Map interface.
-func (v ViewportKeyMap) FullHelp() [][]key.Binding {
+func (v ViewportKeymap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{v.Up, v.Down},                 // first column
 		{v.PageUp, v.PageDown},         // second column
@@ -30,8 +30,8 @@ func (v ViewportKeyMap) FullHelp() [][]key.Binding {
 	}
 }
 
-func Viewport() ViewportKeyMap {
-	v := ViewportKeyMap{
+func Viewport() ViewportKeymap {
+	v := ViewportKeymap{
 		KeyMap: viewport.KeyMap{
 			PageDown: key.NewBinding(
 				key.WithKeys("pgdown", " ", "f"),
