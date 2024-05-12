@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -26,7 +25,6 @@ type Model struct {
 	bus      commands.Bus
 	keymap   keymaps.InputKeymap
 	help     help.Model
-	viewport viewport.Model
 	inputKey textinput.Model
 	key      string
 	value    string
@@ -68,7 +66,6 @@ func SelectedMessage(key string) tea.Cmd {
 			key: key,
 		}
 	}
-
 }
 
 func (m *Model) Code() string {
@@ -114,19 +111,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	if m.quitting {
-		if !m.has {
-			if m.selected {
-				return ""
-			}
-			if m.key == "" {
-				return styles.ColorForegroundSubtle("(empty key)") + "\n"
-			}
-			return styles.ColorForegroundSubtle("("+m.key+" was not set)") + "\n"
-		}
-		if m.selected {
-			return m.value + "\n"
-		}
-		return styles.ColorForegroundSubtle(m.key+" = ") + "\n" + m.value + "\n"
+		return m.result() + "\n"
 	}
 
 	return fmt.Sprintf(
@@ -136,8 +121,17 @@ func (m *Model) View() string {
 	)
 }
 
-func (m *Model) helpView() string {
-	return m.help.View(m.keymap)
+func (m *Model) result() string {
+	if m.selected {
+		return m.value
+	}
+	if !m.has {
+		if m.key == "" {
+			return styles.ColorForegroundSubtle("(empty key)")
+		}
+		return styles.ColorForegroundSubtle("(" + m.key + " was not set)")
+	}
+	return styles.ColorForegroundSubtle(m.key+" = ") + "\n" + m.value + "\n"
 }
 
 func (m *Model) get(key string) (tea.Model, tea.Cmd) {
