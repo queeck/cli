@@ -9,7 +9,6 @@ import (
 
 	"github.com/queeck/cli/internal/services/commands/models/config/view"
 
-	"github.com/queeck/cli/internal/models"
 	"github.com/queeck/cli/internal/pkg/keymaps"
 	"github.com/queeck/cli/internal/pkg/runtime"
 	"github.com/queeck/cli/internal/pkg/styles"
@@ -22,7 +21,7 @@ const (
 	defaultHeight = 12 // default lines count for screen
 )
 
-var commandsList = []models.Command{
+var commandsList = []commands.Variant{
 	{Code: view.Code, Description: "Command for view config keys and values"},
 	{Code: "get", Description: "Command for get config value"},
 	{Code: "set", Description: "Command for set config value"},
@@ -32,7 +31,7 @@ var _ commands.Command = &Config{} // check for interface compatibility
 
 type Config struct {
 	bus      commands.Bus
-	keys     keymaps.Default
+	keymap   keymaps.DefaultKeymap
 	help     help.Model
 	selected int
 	quitting bool
@@ -40,9 +39,9 @@ type Config struct {
 
 func New(bus commands.Bus) commands.Command {
 	return &Config{
-		keys: keymaps.DefaultKeyMap(),
-		help: help.New(),
-		bus:  bus,
+		bus:    bus,
+		keymap: keymaps.Default(),
+		help:   help.New(),
 	}
 }
 
@@ -50,7 +49,7 @@ func (m *Config) Code() string {
 	return Code
 }
 
-func (m *Config) Commands() []models.Command {
+func (m *Config) Commands() []commands.Variant {
 	return commandsList
 }
 
@@ -68,19 +67,19 @@ func (m *Config) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.Up):
+		case key.Matches(msg, m.keymap.Up):
 			m.prev()
-		case key.Matches(msg, m.keys.Down):
+		case key.Matches(msg, m.keymap.Down):
 			m.next()
-		case key.Matches(msg, m.keys.Left):
-			return m.bus.CommandRoot(), nil
-		case key.Matches(msg, m.keys.Right):
+		case key.Matches(msg, m.keymap.Left):
+			return m.bus.Parent(m), nil
+		case key.Matches(msg, m.keymap.Right):
 			return m.choose()
-		case key.Matches(msg, m.keys.Select):
+		case key.Matches(msg, m.keymap.Select):
 			return m.choose()
-		case key.Matches(msg, m.keys.Help):
+		case key.Matches(msg, m.keymap.Help):
 			m.help.ShowAll = !m.help.ShowAll
-		case key.Matches(msg, m.keys.Quit):
+		case key.Matches(msg, m.keymap.Quit):
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -99,7 +98,7 @@ func (m *Config) View() string {
 	equivalent := styles.ColorForegroundHighlight(runtime.Executable() + " config " + selected.Code)
 	text := m.bus.Templates().RenderCommonSelectCommands(list, selected.Description, equivalent)
 
-	helpView := m.help.View(m.keys)
+	helpView := m.help.View(m.keymap)
 	height := max(defaultHeight-strings.Count(text, "\n")-strings.Count(helpView, "\n"), 0)
 
 	screen := text + strings.Repeat("\n", height) + helpView

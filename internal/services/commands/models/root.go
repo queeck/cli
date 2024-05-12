@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/queeck/cli/internal/models"
 	"github.com/queeck/cli/internal/pkg/keymaps"
 	"github.com/queeck/cli/internal/pkg/runtime"
 	"github.com/queeck/cli/internal/pkg/styles"
@@ -20,47 +19,62 @@ const (
 	Code = "root"
 )
 
-var commandsList = []models.Command{
+var commandsList = []commands.Variant{
 	{Code: "env", Description: "Commands for environment — vars, add, remove, change"},
 	{Code: "config", Description: "Commands for configuration — view, get, set"},
 	{Code: "push", Description: "Commands for build and psh current service container to registry"},
 	{Code: "deploy", Description: "Commands for deploy from pushed registry image"},
 }
 
-var _ commands.Command = &Root{} // check for interface compatibility
+var _ commands.Command = &Model{} // check for interface compatibility
 
-type Root struct {
+type Model struct {
 	bus      commands.Bus
-	keys     keymaps.Default
+	keymap   keymaps.DefaultKeymap
 	help     help.Model
 	selected int
 	quitting bool
 }
 
 func New(commands commands.Bus) commands.Command {
-	return &Root{
-		keys: keymaps.DefaultKeyMap(),
-		help: help.New(),
-		bus:  commands,
+	return &Model{
+		keymap: keymaps.Default(),
+		help:   help.New(),
+		bus:    commands,
 	}
 }
 
-func (m *Root) Code() string {
+type InitMsg struct{}
+
+func InitMessage() tea.Msg {
+	return InitMsg{}
+}
+
+func (m *Model) Code() string {
 	return Code
 }
 
-func (m *Root) Commands() []models.Command {
+func (m *Model) Commands() []commands.Variant {
 	return commandsList
 }
 
-func (m *Root) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return InitMessage
 }
 
-func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case InitMsg:
-		return msg.Choose(m.bus)
+		command := m.bus.CommandByCLIArguments(m.bus.Arguments())
+		if command != nil {
+			cmd := command.Init()
+			if cmd == nil {
+				return command, nil
+			}
+			return command.Update(cmd())
+		}
+
+		return m, nil
 	case tea.WindowSizeMsg:
 		// If we set a width on the help menu it can gracefully truncate
 		// its view as needed.
@@ -69,19 +83,19 @@ func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, m.keys.Up):
+		case key.Matches(msg, m.keymap.Up):
 			m.prev()
-		case key.Matches(msg, m.keys.Down):
+		case key.Matches(msg, m.keymap.Down):
 			m.next()
-		case key.Matches(msg, m.keys.Left):
+		case key.Matches(msg, m.keymap.Left):
 			//
-		case key.Matches(msg, m.keys.Right):
+		case key.Matches(msg, m.keymap.Right):
 			return m.choose()
-		case key.Matches(msg, m.keys.Select):
+		case key.Matches(msg, m.keymap.Select):
 			return m.choose()
-		case key.Matches(msg, m.keys.Help):
+		case key.Matches(msg, m.keymap.Help):
 			m.help.ShowAll = !m.help.ShowAll
-		case key.Matches(msg, m.keys.Quit):
+		case key.Matches(msg, m.keymap.Quit):
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -90,7 +104,7 @@ func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Root) View() string {
+func (m *Model) View() string {
 	if m.quitting {
 		return m.bus.Templates().RenderCommonQuit()
 	}
@@ -100,25 +114,25 @@ func (m *Root) View() string {
 	equivalent := styles.ColorForegroundHighlight(runtime.Executable() + " " + selected.Code)
 	text := m.bus.Templates().RenderCommonSelectCommands(list, selected.Description, equivalent)
 
-	helpView := m.help.View(m.keys)
+	helpView := m.help.View(m.keymap)
 	height := max(defaultHeight-strings.Count(text, "\n")-strings.Count(helpView, "\n"), 0)
 
 	screen := text + strings.Repeat("\n", height) + helpView
 	return screen
 }
 
-func (m *Root) next() {
+func (m *Model) next() {
 	m.selected = (m.selected + 1) % len(commandsList)
 }
 
-func (m *Root) prev() {
+func (m *Model) prev() {
 	if m.selected == 0 {
 		m.selected = len(commandsList)
 	}
 	m.selected = (m.selected - 1) % len(commandsList)
 }
 
-func (m *Root) choose() (tea.Model, tea.Cmd) {
+func (m *Model) choose() (tea.Model, tea.Cmd) {
 	if command := m.bus.Child(m, commandsList[m.selected].Code); command != nil {
 		return command, nil
 	}

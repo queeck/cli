@@ -17,23 +17,37 @@ type Line struct {
 	Value string
 }
 
-func ViewLines(configData []byte) []Line {
-	return walk(gjson.ParseBytes(configData), "")
-}
-
-func View(configData []byte) string {
-	lines := ViewLines(configData)
+func findMaxKeyLength(lines []Line) int {
 	maxKeyLength := 0
 	for _, line := range lines {
 		if len(line.Key) > maxKeyLength {
 			maxKeyLength = len(line.Key)
 		}
 	}
+	return maxKeyLength
+}
+
+func keys(configData []byte) []string {
+	lines := viewLines(configData)
+	results := make([]string, 0, len(lines))
+	for _, line := range lines {
+		results = append(results, line.Key)
+	}
+	return results
+}
+
+func view(configData []byte) string {
+	lines := viewLines(configData)
+	maxKeyLength := findMaxKeyLength(lines)
 	results := make([]string, 0, len(lines))
 	for _, line := range lines {
 		results = append(results, viewLine(line, maxKeyLength))
 	}
 	return strings.Join(results, "\n")
+}
+
+func viewLines(configData []byte) []Line {
+	return walk(gjson.ParseBytes(configData), "")
 }
 
 func viewLine(line Line, maxKeyLength int) string {

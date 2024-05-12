@@ -79,7 +79,16 @@ func (s *Service) Child(command commands.Command, code string) commands.Command 
 
 func (s *Service) CommandByCLIArguments(arguments cli.Arguments) commands.Command {
 	routes := append([]string{modelRoot.Code}, arguments.Commands()...)
-	return s.routes[makeRoute(routes...)]
+	for {
+		if command, has := s.routes[makeRoute(routes...)]; has {
+			return command
+		}
+		routes = routes[0 : len(routes)-1]
+		if len(routes) == 0 {
+			break
+		}
+	}
+	return nil
 }
 
 func (s *Service) SelectedCommands(command commands.Command, code string) string {
