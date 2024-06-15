@@ -2,6 +2,11 @@ package hierarchy
 
 import (
 	"github.com/queeck/cli/internal/services/commands"
+	modelRoot "github.com/queeck/cli/internal/services/commands/models"
+	modelConfig "github.com/queeck/cli/internal/services/commands/models/config"
+	modelConfigGet "github.com/queeck/cli/internal/services/commands/models/config/get"
+	modelConfigSet "github.com/queeck/cli/internal/services/commands/models/config/set"
+	modelConfigView "github.com/queeck/cli/internal/services/commands/models/config/view"
 )
 
 type Hierarchy interface {
@@ -26,4 +31,14 @@ func (h *hiera) Children() []Hierarchy {
 
 func Node(builder CommandBuilder, children ...Hierarchy) Hierarchy {
 	return &hiera{builder: builder, children: children}
+}
+
+func Default() Hierarchy {
+	return Node(modelRoot.New,
+		Node(modelConfig.New,
+			Node(modelConfigGet.New),
+			Node(modelConfigSet.New),
+			Node(modelConfigView.New),
+		),
+	)
 }

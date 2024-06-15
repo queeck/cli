@@ -1,7 +1,6 @@
 package view
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -12,33 +11,45 @@ import (
 
 	"github.com/queeck/cli/internal/pkg/keymaps"
 	"github.com/queeck/cli/internal/services/commands"
+	"github.com/queeck/cli/internal/services/config"
+	"github.com/queeck/cli/internal/services/templates"
+	"github.com/queeck/cli/internal/services/templates/texts"
 )
 
 const (
 	Code = "view"
 )
 
+type Templates interface {
+	templates.RendererCommon
+	templates.RendererConfigView
+}
+
 var _ commands.Command = &Model{} // check for interface compatibility
 
 type Model struct {
-	bus      commands.Bus
-	keymap   keymaps.ViewportKeymap
-	help     help.Model
-	viewport viewport.Model
-	view     string
-	quitting bool
-	ready    bool
-	width    int
-	height   int
+	keymap    keymaps.ViewportKeymap
+	help      help.Model
+	viewport  viewport.Model
+	templates Templates
+	parent    func(commands.Command) commands.Command
+	config    config.Config
+	view      string
+	quitting  bool
+	ready     bool
+	width     int
+	height    int
 }
 
 func New(bus commands.Bus) commands.Command {
 	return &Model{
-		bus:    bus,
-		keymap: keymaps.Viewport(),
-		help:   help.New(),
-		view:   bus.Config().View(),
-		ready:  false,
+		keymap:    keymaps.Viewport(),
+		help:      help.New(),
+		view:      bus.Config().View(),
+		templates: bus.Templates(),
+		parent:    bus.Parent,
+		config:    bus.Config(),
+		ready:     false,
 	}
 }
 
@@ -67,7 +78,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.Left):
-			return m.bus.Parent(m), nil
+			return m.parent(m), nil
 		case key.Matches(msg, m.keymap.Help):
 			m.help.ShowAll = !m.help.ShowAll
 			m.ready = false
@@ -85,13 +96,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	if m.quitting {
-		return m.bus.Templates().RenderCommonQuit()
+		return m.templates.RenderCommonQuit()
 	}
 
 	if !m.ready {
-		return "\n  Initializing..."
+		return texts.ConfigViewInitializing
 	}
-	return fmt.Sprintf("%s\n%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView(), m.helpView())
+
+	return m.templates.RenderConfigViewScreen(m.headerView(), m.viewport.View(), m.footerView(), m.helpView())
 }
 
 func (m *Model) sync() {
@@ -120,13 +132,17 @@ func (m *Model) sync() {
 }
 
 func (m *Model) headerView() string {
-	title := styleTitle().Render("Config: " + m.bus.Config().Path())
+	configPath := m.config.Path()
+	headerTitle := m.templates.RenderConfigViewHeaderTitle(configPath)
+	title := styleTitle().Render(headerTitle)
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }
 
 func (m *Model) footerView() string {
-	info := styleInfo().Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100)) //nolint:mnd // not a magic number
+	scrollPercent := m.viewport.ScrollPercent()
+	footerInfo := m.templates.RenderConfigViewFooterInfo(scrollPercent)
+	info := styleInfo().Render(footerInfo)
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
 }

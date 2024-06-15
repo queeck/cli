@@ -11,6 +11,17 @@ import (
 	serviceDirectory "github.com/queeck/cli/internal/services/directory"
 )
 
+type ValueType string
+
+const (
+	TypeNull   ValueType = "null"
+	TypeBool   ValueType = "bool"
+	TypeNumber ValueType = "number"
+	TypeString ValueType = "string"
+	TypeArray  ValueType = "array"
+	TypeObject ValueType = "object"
+)
+
 const (
 	defaultFilename = "config.json"
 	defaultData     = `{}`
@@ -19,7 +30,9 @@ const (
 type Config interface {
 	Get(path string) (value any, has bool)
 	GetString(path string) (value string, has bool)
+	Type(path string) ValueType
 	Set(path string, value any) error
+	Save() error
 	View() string
 	Keys() []string
 	Path() string
@@ -73,6 +86,29 @@ func (c *config) GetString(path string) (string, bool) {
 	return result.String(), true
 }
 
+func (c *config) Type(path string) ValueType {
+	result := c.get(path)
+	if !result.Exists() {
+		return TypeNull
+	}
+	if result.IsBool() {
+		return TypeBool
+	}
+	if result.IsArray() {
+		return TypeArray
+	}
+	if result.IsObject() {
+		return TypeObject
+	}
+	if result.Type == gjson.String {
+		return TypeString
+	}
+	if result.Type == gjson.Number {
+		return TypeNumber
+	}
+	return TypeNull
+}
+
 func (c *config) Set(path string, value any) error {
 	data, err := sjson.SetBytes(c.data, path, value)
 	if err != nil {
@@ -87,11 +123,11 @@ func (c *config) Path() string {
 }
 
 func (c *config) Keys() []string {
-	list := keys(c.data)
+	list := Keys(c.data)
 	slices.Sort(list)
 	return list
 }
 
 func (c *config) View() string {
-	return view(c.data)
+	return View(c.data)
 }

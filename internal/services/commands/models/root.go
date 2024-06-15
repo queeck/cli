@@ -11,6 +11,7 @@ import (
 	"github.com/queeck/cli/internal/pkg/runtime"
 	"github.com/queeck/cli/internal/pkg/styles"
 	"github.com/queeck/cli/internal/services/commands"
+	"github.com/queeck/cli/internal/services/templates"
 )
 
 const (
@@ -29,18 +30,30 @@ var commandsList = []commands.Variant{
 var _ commands.Command = &Model{} // check for interface compatibility
 
 type Model struct {
-	bus      commands.Bus
-	keymap   keymaps.DefaultKeymap
-	help     help.Model
-	selected int
-	quitting bool
+	keymap             keymaps.DefaultKeymap
+	help               help.Model
+	templates          templates.RendererCommon
+	commandByArguments func() commands.Command
+	commandConfigView  func() commands.Command
+	child              func(command commands.Command, code string) commands.Command
+	selectedCommands   func(command commands.Command, code string) string
+	selected           int
+	quitting           bool
 }
 
-func New(commands commands.Bus) commands.Command {
+func New(bus commands.Bus) commands.Command {
+	commandByArguments := func() commands.Command {
+		// used as callback because on this moment command bus doesn't have registered routes
+		return bus.CommandByCLIArguments(bus.Arguments())
+	}
 	return &Model{
-		keymap: keymaps.Default(),
-		help:   help.New(),
-		bus:    commands,
+		keymap:             keymaps.Default(),
+		help:               help.New(),
+		templates:          bus.Templates(),
+		commandByArguments: commandByArguments,
+		commandConfigView:  bus.CommandConfigView,
+		child:              bus.Child,
+		selectedCommands:   bus.SelectedCommands,
 	}
 }
 
@@ -65,8 +78,7 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case InitMsg:
-		command := m.bus.CommandByCLIArguments(m.bus.Arguments())
-		if command != nil {
+		if command := m.commandByArguments(); command != nil && command != m {
 			cmd := command.Init()
 			if cmd == nil {
 				return command, nil
@@ -79,7 +91,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If we set a width on the help menu it can gracefully truncate
 		// its view as needed.
 		m.help.Width = msg.Width
-		m.bus.CommandConfigView().Update(msg) // Prepare sizing for viewport
+		m.commandConfigView().Update(msg) // Prepare sizing for viewport
 
 	case tea.KeyMsg:
 		switch {
@@ -106,13 +118,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	if m.quitting {
-		return m.bus.Templates().RenderCommonQuit()
+		return m.templates.RenderCommonQuit()
 	}
 
 	selected := m.Commands()[m.selected]
-	list := m.bus.SelectedCommands(m, selected.Code)
+	list := m.selectedCommands(m, selected.Code)
 	equivalent := styles.ColorForegroundHighlight(runtime.Executable() + " " + selected.Code)
-	text := m.bus.Templates().RenderCommonSelectCommands(list, selected.Description, equivalent)
+	text := m.templates.RenderCommonSelectCommands(list, selected.Description, equivalent)
 
 	helpView := m.help.View(m.keymap)
 	height := max(defaultHeight-strings.Count(text, "\n")-strings.Count(helpView, "\n"), 0)
@@ -133,7 +145,7 @@ func (m *Model) prev() {
 }
 
 func (m *Model) choose() (tea.Model, tea.Cmd) {
-	if command := m.bus.Child(m, commandsList[m.selected].Code); command != nil {
+	if command := m.child(m, commandsList[m.selected].Code); command != nil {
 		return command, nil
 	}
 	return m, nil
