@@ -46,6 +46,8 @@ var escapes = []string{
 	termenv.CSI + termenv.ChangeScrollingRegionSeq,
 	termenv.CSI + termenv.InsertLineSeq,
 	termenv.CSI + termenv.DeleteLineSeq,
+
+	termenv.CSI + "D",
 }
 
 var splits = []string{
