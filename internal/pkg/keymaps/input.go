@@ -36,7 +36,7 @@ func Input() InputKeymap {
 			key.WithHelp("tab", ": autocomplete"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys("enter", " "),
+			key.WithKeys("enter"),
 			key.WithHelp("enter", ": select"),
 		),
 		Quit: key.NewBinding(

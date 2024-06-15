@@ -1,8 +1,8 @@
 package get
 
 import (
-	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -10,9 +10,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/queeck/cli/internal/pkg/cli"
 	"github.com/queeck/cli/internal/pkg/keymaps"
-	"github.com/queeck/cli/internal/pkg/styles"
 	"github.com/queeck/cli/internal/services/commands"
+	"github.com/queeck/cli/internal/services/config"
+	"github.com/queeck/cli/internal/services/templates"
 )
 
 const (
@@ -22,15 +24,18 @@ const (
 var _ commands.Command = &Model{} // check for interface compatibility
 
 type Model struct {
-	bus      commands.Bus
-	keymap   keymaps.InputKeymap
-	help     help.Model
-	inputKey textinput.Model
-	key      string
-	value    string
-	has      bool
-	quitting bool
-	selected bool
+	keymap    keymaps.InputKeymap
+	help      help.Model
+	inputKey  textinput.Model
+	templates templates.RendererConfigGet
+	arguments cli.Arguments
+	parent    func(commands.Command) commands.Command
+	config    config.Config
+	key       string
+	value     string
+	has       bool
+	quitting  bool
+	selected  bool
 }
 
 func newInputKey(suggestions []string) textinput.Model {
@@ -49,22 +54,21 @@ func newInputKey(suggestions []string) textinput.Model {
 
 func New(bus commands.Bus) commands.Command {
 	return &Model{
-		bus:      bus,
-		keymap:   keymaps.Input(),
-		help:     help.New(),
-		inputKey: newInputKey(bus.Config().Keys()),
+		keymap:    keymaps.Input(),
+		help:      help.New(),
+		inputKey:  newInputKey(bus.Config().Keys()),
+		templates: bus.Templates(),
+		arguments: bus.Arguments(),
+		parent:    bus.Parent,
+		config:    bus.Config(),
 	}
 }
 
-type SelectedMsg struct {
-	key string
-}
+type SelectedMsg struct{}
 
-func SelectedMessage(key string) tea.Cmd {
+func SelectedMessage() tea.Cmd {
 	return func() tea.Msg {
-		return SelectedMsg{
-			key: key,
-		}
+		return SelectedMsg{}
 	}
 }
 
@@ -77,10 +81,11 @@ func (m *Model) Commands() []commands.Variant {
 }
 
 func (m *Model) Init() tea.Cmd {
-	args := m.bus.Arguments().Commands()
+	args := m.arguments.Commands()
 	index := slices.Index(args, Code)
 	if index+1 < len(args) {
-		return SelectedMessage(args[index+1])
+		m.key = args[index+1]
+		return SelectedMessage()
 	}
 	return textinput.Blink
 }
@@ -93,13 +98,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case SelectedMsg:
 		m.selected = true
-		return m.get(msg.key)
+		return m.get()
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.Left):
-			return m.bus.Parent(m), nil
+			return m.parent(m), nil
 		case key.Matches(msg, m.keymap.Select):
-			return m.get(m.inputKey.Value())
+			m.key = m.inputKey.Value()
+			return m.get()
 		case key.Matches(msg, m.keymap.Quit):
 			return m.quit()
 		}
@@ -111,36 +117,38 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() string {
 	if m.quitting {
-		return m.result() + "\n"
+		return withNewLine(m.result())
 	}
 
-	return fmt.Sprintf(
-		"Enter key:\n\n  %s\n\n%s\n\n",
-		m.inputKey.View(),
-		m.help.View(m.keymap),
-	)
+	return m.templates.RenderConfigGetScreen(m.inputKey.View(), m.help.View(m.keymap))
 }
 
 func (m *Model) result() string {
 	if m.selected {
-		return m.value
+		return m.templates.RenderConfigGetValue(m.value)
 	}
 	if !m.has {
 		if m.key == "" {
-			return styles.ColorForegroundSubtle("(empty key)")
+			return m.templates.RenderConfigGetKeyIsEmpty()
 		}
-		return styles.ColorForegroundSubtle("(" + m.key + " was not set)")
+		return m.templates.RenderConfigGetKeyNotFound(m.key)
 	}
-	return styles.ColorForegroundSubtle(m.key+" = ") + "\n" + m.value + "\n"
+	return m.templates.RenderConfigGetValueWithKey(m.key, m.value)
 }
 
-func (m *Model) get(key string) (tea.Model, tea.Cmd) {
-	m.key = key
-	m.value, m.has = m.bus.Config().GetString(m.key)
+func (m *Model) get() (tea.Model, tea.Cmd) {
+	m.value, m.has = m.config.GetString(m.key)
 	return m.quit()
 }
 
 func (m *Model) quit() (tea.Model, tea.Cmd) {
 	m.quitting = true
 	return m, tea.Quit
+}
+
+func withNewLine(text string) string {
+	if !strings.HasSuffix(text, "\n") {
+		text += "\n"
+	}
+	return text
 }

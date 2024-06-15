@@ -29,8 +29,8 @@ func New(
 	state state,
 	config config,
 	templates templates,
-) (bus *Service, err error) {
-	bus = &Service{
+) *Service {
+	bus := &Service{
 		arguments: arguments,
 		state:     state,
 		templates: templates,
@@ -39,7 +39,7 @@ func New(
 
 	bus.routes = bus.walk(hierarchy)
 
-	return bus, nil
+	return bus
 }
 
 func (s *Service) State() serviceState.State {

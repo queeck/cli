@@ -17,7 +17,7 @@ type Line struct {
 	Value string
 }
 
-func findMaxKeyLength(lines []Line) int {
+func FindMaxKeyLength(lines []Line) int {
 	maxKeyLength := 0
 	for _, line := range lines {
 		if len(line.Key) > maxKeyLength {
@@ -27,8 +27,8 @@ func findMaxKeyLength(lines []Line) int {
 	return maxKeyLength
 }
 
-func keys(configData []byte) []string {
-	lines := viewLines(configData)
+func Keys(configData []byte) []string {
+	lines := ViewLines(configData)
 	results := make([]string, 0, len(lines))
 	for _, line := range lines {
 		results = append(results, line.Key)
@@ -36,40 +36,40 @@ func keys(configData []byte) []string {
 	return results
 }
 
-func view(configData []byte) string {
-	lines := viewLines(configData)
-	maxKeyLength := findMaxKeyLength(lines)
+func View(configData []byte) string {
+	lines := ViewLines(configData)
+	maxKeyLength := FindMaxKeyLength(lines)
 	results := make([]string, 0, len(lines))
 	for _, line := range lines {
-		results = append(results, viewLine(line, maxKeyLength))
+		results = append(results, ViewLine(line, maxKeyLength))
 	}
 	return strings.Join(results, "\n")
 }
 
-func viewLines(configData []byte) []Line {
-	return walk(gjson.ParseBytes(configData), "")
+func ViewLines(configData []byte) []Line {
+	return Walk(gjson.ParseBytes(configData), "")
 }
 
-func viewLine(line Line, maxKeyLength int) string {
+func ViewLine(line Line, maxKeyLength int) string {
 	pad := strconv.Itoa(maxKeyLength)
 	return fmt.Sprintf("%-"+pad+"s = %v", line.Key, line.Value)
 }
 
-func walk(node gjson.Result, key string) []Line {
+func Walk(node gjson.Result, key string) []Line {
 	lines := make([]Line, 0, 1)
 	if !node.Exists() {
 		return append(lines, Line{Key: key, Value: ""})
 	}
 	if node.IsArray() {
 		for n, childNode := range node.Array() {
-			children := walk(childNode, join(key, strconv.Itoa(n)))
+			children := Walk(childNode, Join(key, strconv.Itoa(n)))
 			lines = append(lines, children...)
 		}
 		return lines
 	}
 	if node.IsObject() {
 		for childKey, childNode := range node.Map() {
-			children := walk(childNode, join(key, childKey))
+			children := Walk(childNode, Join(key, childKey))
 			lines = append(lines, children...)
 		}
 		return lines
@@ -77,7 +77,7 @@ func walk(node gjson.Result, key string) []Line {
 	return append(lines, Line{Key: key, Value: node.String()})
 }
 
-func join(key string, chunks ...string) string {
+func Join(key string, chunks ...string) string {
 	if key == "" {
 		return strings.Join(chunks, delimiter)
 	}
