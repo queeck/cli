@@ -5,7 +5,7 @@ go 1.22.2
 require (
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.4
-	github.com/charmbracelet/lipgloss v0.12.1
+	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/commander-cli/cmd v1.6.0
 	github.com/json-iterator/go v1.1.12
 	github.com/muesli/termenv v0.15.2
