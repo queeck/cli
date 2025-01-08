@@ -11,5 +11,5 @@ func styleTitle() lipgloss.Style {
 func styleInfo() lipgloss.Style {
 	b := lipgloss.RoundedBorder()
 	b.Left = "┤"
-	return styleTitle().Copy().BorderStyle(b)
+	return styleTitle().BorderStyle(b)
 }

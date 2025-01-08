@@ -10,11 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/queeck/cli/internal/pkg/cli"
 	"github.com/queeck/cli/internal/pkg/keymaps"
 	"github.com/queeck/cli/internal/services/commands"
-	"github.com/queeck/cli/internal/services/config"
-	"github.com/queeck/cli/internal/services/templates"
 )
 
 const (
@@ -24,21 +21,18 @@ const (
 var _ commands.Command = &Model{} // check for interface compatibility
 
 type Model struct {
-	keymap    keymaps.InputKeymap
-	help      help.Model
-	inputKey  textinput.Model
-	templates templates.RendererConfigGet
-	arguments cli.Arguments
-	parent    func(commands.Command) commands.Command
-	config    config.Config
-	key       string
-	value     string
-	has       bool
-	quitting  bool
-	selected  bool
+	bus      commands.Bus
+	keymap   keymaps.InputKeymap
+	help     help.Model
+	inputKey textinput.Model
+	key      string
+	value    string
+	has      bool
+	quitting bool
+	selected bool
 }
 
-func newInputKey(suggestions []string) textinput.Model {
+func newInputKeyWithSuggestions(suggestions []string) textinput.Model {
 	input := textinput.New()
 	input.Placeholder = "<key.with.dots>"
 	input.Prompt = "config/"
@@ -54,13 +48,10 @@ func newInputKey(suggestions []string) textinput.Model {
 
 func New(bus commands.Bus) commands.Command {
 	return &Model{
-		keymap:    keymaps.Input(),
-		help:      help.New(),
-		inputKey:  newInputKey(bus.Config().Keys()),
-		templates: bus.Templates(),
-		arguments: bus.Arguments(),
-		parent:    bus.Parent,
-		config:    bus.Config(),
+		bus:      bus,
+		keymap:   keymaps.Input(),
+		help:     help.New(),
+		inputKey: newInputKeyWithSuggestions(bus.Config().Keys()),
 	}
 }
 
@@ -81,7 +72,7 @@ func (m *Model) Commands() []commands.Variant {
 }
 
 func (m *Model) Init() tea.Cmd {
-	args := m.arguments.Commands()
+	args := m.bus.Arguments().Commands()
 	index := slices.Index(args, Code)
 	if index+1 < len(args) {
 		m.key = args[index+1]
@@ -102,7 +93,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.Left):
-			return m.parent(m), nil
+			return m.bus.Parent(m), nil
 		case key.Matches(msg, m.keymap.Select):
 			m.key = m.inputKey.Value()
 			return m.get()
@@ -120,24 +111,27 @@ func (m *Model) View() string {
 		return withNewLine(m.result())
 	}
 
-	return m.templates.RenderConfigGetScreen(m.inputKey.View(), m.help.View(m.keymap))
+	return m.bus.Templates().Render(templateScreen,
+		"inputKey", m.inputKey.View(),
+		"help", m.help.View(m.keymap),
+	)
 }
 
 func (m *Model) result() string {
 	if m.selected {
-		return m.templates.RenderConfigGetValue(m.value)
+		return m.bus.Templates().Render(templateValue, "value", m.value)
 	}
 	if !m.has {
 		if m.key == "" {
-			return m.templates.RenderConfigGetKeyIsEmpty()
+			return m.bus.Templates().Render(templateKeyIsEmpty)
 		}
-		return m.templates.RenderConfigGetKeyNotFound(m.key)
+		return m.bus.Templates().Render(templateKeyNotFound, "key", m.key)
 	}
-	return m.templates.RenderConfigGetValueWithKey(m.key, m.value)
+	return m.bus.Templates().Render(templateValueWithKey, "key", m.key, "value", m.value)
 }
 
 func (m *Model) get() (tea.Model, tea.Cmd) {
-	m.value, m.has = m.config.GetString(m.key)
+	m.value, m.has = m.bus.Config().GetString(m.key)
 	return m.quit()
 }
 

@@ -11,8 +11,10 @@ import (
 	"github.com/queeck/cli/internal/pkg/runtime"
 	"github.com/queeck/cli/internal/pkg/styles"
 	"github.com/queeck/cli/internal/services/commands"
+	"github.com/queeck/cli/internal/services/commands/models"
+	"github.com/queeck/cli/internal/services/commands/models/config/get"
+	"github.com/queeck/cli/internal/services/commands/models/config/set"
 	"github.com/queeck/cli/internal/services/commands/models/config/view"
-	"github.com/queeck/cli/internal/services/templates"
 )
 
 const (
@@ -23,33 +25,25 @@ const (
 
 var commandsList = []commands.Variant{
 	{Code: view.Code, Description: "Command for view config keys and values"},
-	{Code: "get", Description: "Command for get config value"},
-	{Code: "set", Description: "Command for set config value"},
+	{Code: get.Code, Description: "Command for get config value"},
+	{Code: set.Code, Description: "Command for set config value"},
 }
 
 var _ commands.Command = &Config{} // check for interface compatibility
 
 type Config struct {
-	keymap            keymaps.DefaultKeymap
-	help              help.Model
-	commandConfigView commands.Command
-	parent            func(command commands.Command) commands.Command
-	child             func(command commands.Command, code string) commands.Command
-	templates         templates.RendererCommon
-	selectedCommands  func(command commands.Command, code string) string
-	selected          int
-	quitting          bool
+	bus      commands.Bus
+	keymap   keymaps.DefaultKeymap
+	help     help.Model
+	selected int
+	quitting bool
 }
 
 func New(bus commands.Bus) commands.Command {
 	return &Config{
-		keymap:            keymaps.Default(),
-		help:              help.New(),
-		commandConfigView: bus.CommandConfigView(),
-		parent:            bus.Parent,
-		child:             bus.Child,
-		templates:         bus.Templates(),
-		selectedCommands:  bus.SelectedCommands,
+		bus:    bus,
+		keymap: keymaps.Default(),
+		help:   help.New(),
 	}
 }
 
@@ -71,7 +65,7 @@ func (m *Config) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If we set a width on the help menu it can gracefully truncate
 		// its view as needed.
 		m.help.Width = msg.Width
-		m.commandConfigView.Update(msg) // Prepare sizing for viewport
+		m.bus.UpdateWindowSize(msg.Width, msg.Height)
 
 	case tea.KeyMsg:
 		switch {
@@ -80,7 +74,7 @@ func (m *Config) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keymap.Down):
 			m.next()
 		case key.Matches(msg, m.keymap.Left):
-			return m.parent(m), nil
+			return m.bus.Parent(m), nil
 		case key.Matches(msg, m.keymap.Right):
 			return m.choose()
 		case key.Matches(msg, m.keymap.Select):
@@ -98,13 +92,18 @@ func (m *Config) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Config) View() string {
 	if m.quitting {
-		return m.templates.RenderCommonQuit()
+		return m.bus.Templates().Render(models.TemplateQuit)
 	}
 
 	selected := m.Commands()[m.selected]
-	list := m.selectedCommands(m, selected.Code)
+	list := m.bus.SelectedCommands(m, selected.Code)
 	equivalent := styles.ColorForegroundHighlight(runtime.Executable() + " config " + selected.Code)
-	text := m.templates.RenderCommonSelectCommands(list, selected.Description, equivalent)
+
+	text := m.bus.Templates().Render(models.TemplateSelectCommand,
+		"commands", list,
+		"description", selected.Description,
+		"equivalent", equivalent,
+	)
 
 	helpView := m.help.View(m.keymap)
 	height := max(defaultHeight-strings.Count(text, "\n")-strings.Count(helpView, "\n"), 0)
@@ -125,7 +124,7 @@ func (m *Config) prev() {
 }
 
 func (m *Config) choose() (tea.Model, tea.Cmd) {
-	if command := m.child(m, commandsList[m.selected].Code); command != nil {
+	if command := m.bus.Child(m, commandsList[m.selected].Code); command != nil {
 		return command, nil
 	}
 	return m, nil

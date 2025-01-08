@@ -20,6 +20,11 @@ type Command interface {
 	Commands() []Variant
 }
 
+type Window interface {
+	Width() int
+	Height() int
+}
+
 // Bus is common interface for all commands.
 // Here is for prevent import cycle, this interface uses by:
 // - services/stack
@@ -35,6 +40,11 @@ type Bus interface {
 	CommandByCLIArguments(arguments cli.Arguments) Command
 	SelectedCommands(command Command, code string) string
 	CommandRoot() Command
-	CommandConfig() Command
-	CommandConfigView() Command
+	ForEach(fn func(route string, command Command) bool)
+	Window() Window
+	UpdateWindowSize(width, height int)
+}
+
+type OnWindowSizeUpdatable interface {
+	OnUpdateWindowSize(tea.WindowSizeMsg)
 }

@@ -11,11 +11,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/queeck/cli/internal/pkg/cli"
 	"github.com/queeck/cli/internal/pkg/keymaps"
 	"github.com/queeck/cli/internal/services/commands"
+	"github.com/queeck/cli/internal/services/commands/models"
 	"github.com/queeck/cli/internal/services/config"
-	"github.com/queeck/cli/internal/services/templates"
 )
 
 const (
@@ -25,14 +24,11 @@ const (
 var _ commands.Command = &Model{} // check for interface compatibility
 
 type Model struct {
+	bus           commands.Bus
 	keymap        keymaps.InputKeymap
 	help          help.Model
 	inputKey      textinput.Model
 	inputValue    textinput.Model
-	templates     templates.Renderer
-	parent        func(commands.Command) commands.Command
-	config        config.Config
-	arguments     cli.Arguments
 	key           string
 	value         string
 	quitting      bool
@@ -43,7 +39,7 @@ type Model struct {
 	setError      string
 }
 
-func newInputKey(suggestions []string) textinput.Model {
+func newInputKeyWithSuggestions(suggestions []string) textinput.Model {
 	input := textinput.New()
 	input.Placeholder = "<key.with.dots>"
 	input.Prompt = "config/"
@@ -71,14 +67,11 @@ func newInputValue(key string) textinput.Model {
 
 func New(bus commands.Bus) commands.Command {
 	return &Model{
+		bus:        bus,
 		keymap:     keymaps.Input(),
 		help:       help.New(),
-		inputKey:   newInputKey(bus.Config().Keys()),
+		inputKey:   newInputKeyWithSuggestions(bus.Config().Keys()),
 		inputValue: newInputValue(""),
-		templates:  bus.Templates(),
-		parent:     bus.Parent,
-		config:     bus.Config(),
-		arguments:  bus.Arguments(),
 	}
 }
 
@@ -99,7 +92,7 @@ func (m *Model) Commands() []commands.Variant {
 }
 
 func (m *Model) Init() tea.Cmd {
-	args := m.arguments.Commands()
+	args := m.bus.Arguments().Commands()
 	index := slices.Index(args, Code)
 	if index+1 < len(args) {
 		m.key = args[index+1]
@@ -124,7 +117,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.Left):
-			return m.parent(m), nil
+			return m.bus.Parent(m), nil
 		case key.Matches(msg, m.keymap.Select):
 			return m.enter()
 		case key.Matches(msg, m.keymap.Quit):
@@ -146,23 +139,30 @@ func (m *Model) View() string {
 		return withNewLine("Error: " + m.setError)
 	}
 	if m.quitting {
-		return m.templates.RenderCommonQuit()
+		return m.bus.Templates().Render(models.TemplateQuit)
 	}
 
 	if m.isKeyNotFound {
-		return m.templates.RenderConfigSetKeyNotFound(m.key)
+		return m.bus.Templates().Render(templateKeyNotFound, "key", m.key)
 	}
 
 	if m.isKeyComplex {
-		return m.templates.RenderConfigSetKeyHasComplexType(m.key)
+		return m.bus.Templates().Render(templateKeyHasComplexType, "key", m.key)
 	}
 
 	if !m.selected || m.key == "" {
-		return m.templates.RenderConfigSetKeyScreen(m.inputKey.View(), m.help.View(m.keymap))
+		return m.bus.Templates().Render(templateKeyScreen,
+			"inputKey", m.inputKey.View(),
+			"help", m.help.View(m.keymap),
+		)
 	}
 
 	if m.value == "" {
-		return m.templates.RenderConfigSetValueScreen(m.inputValue.View(), m.key, m.help.View(m.keymap))
+		return m.bus.Templates().Render(templateValueScreen,
+			"inputValue", m.inputValue.View(),
+			"key", m.key,
+			"help", m.help.View(m.keymap),
+		)
 	}
 
 	return withNewLine(fmt.Sprintf("%s = %s", m.key, m.value))
@@ -192,7 +192,7 @@ func (m *Model) enter() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	valueType := m.config.Type(m.key)
+	valueType := m.bus.Config().Type(m.key)
 	if valueType == config.TypeNull {
 		m.isKeyNotFound = true
 	}
@@ -209,10 +209,10 @@ func (m *Model) enter() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) save() error {
-	if err := m.config.Set(m.key, m.value); err != nil {
+	if err := m.bus.Config().Set(m.key, m.value); err != nil {
 		return fmt.Errorf("failed to set value: %w", err)
 	}
-	if err := m.config.Save(); err != nil {
+	if err := m.bus.Config().Save(); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 	return nil

@@ -1,6 +1,6 @@
-package texts
+package get
 
-const ConfigGetScreen = `
+const templateScreen = `
 Enter key:
 
 	{{ .inputKey }}
@@ -9,18 +9,18 @@ Enter key:
 
 `
 
-const ConfigGetKeyIsEmpty = `
+const templateKeyIsEmpty = `
 {{ print "(key is empty)" | subtle }}
 `
 
-const ConfigGetKeyNotFound = `
+const templateKeyNotFound = `
 {{ print "(key " .key " not found)" | subtle }}
 `
 
-const ConfigGetValueWithKey = `
+const templateValueWithKey = `
 {{ print .key " =" | subtle }} {{ .value | highlight }}
 `
 
-const ConfigGetValue = `
+const templateValue = `
 {{ .value }}
 `
