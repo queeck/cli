@@ -1,10 +1,12 @@
-package texts
+package models
 
-const CommonQuit = `
+const TemplateQuit = `
+
 		ʕ •ɷ•ʔ ฅ		Bye!
 
 `
-const CommonSelectCommand = `
+
+const TemplateSelectCommand = `
 Let’s make it queeck 🐸
 Choose command:
 {{ .commands }}

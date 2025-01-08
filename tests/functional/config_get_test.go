@@ -37,7 +37,7 @@ func TestConfigGet(t *testing.T) {
 
 		err := program.Run(ctx)
 		require.Error(t, err)
-		require.Equal(t, tea.ErrProgramKilled, err)
+		require.ErrorIs(t, err, tea.ErrProgramKilled)
 
 		frames := out.FramesWithLF()
 		require.NotEmpty(t, frames)

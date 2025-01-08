@@ -32,14 +32,16 @@ func TestConfigView(t *testing.T) {
 
 		program := makeApp(cfg, args, in, out)
 
-		program.CommandBus().CommandConfigView().Update(tea.WindowSizeMsg{
+		command := program.CommandBus().CommandRoot()
+
+		command.Update(tea.WindowSizeMsg{
 			Width:  80,
 			Height: 8,
 		}) // Prepare sizing for viewport
 
 		err := program.Run(ctx)
 		require.Error(t, err)
-		require.Equal(t, tea.ErrProgramKilled, err)
+		require.ErrorIs(t, err, tea.ErrProgramKilled)
 
 		frames := out.FramesWithLF()
 		require.NotEmpty(t, frames)

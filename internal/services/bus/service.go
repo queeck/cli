@@ -5,8 +5,6 @@ import (
 	"github.com/queeck/cli/internal/services/commands"
 	"github.com/queeck/cli/internal/services/commands/hierarchy"
 	modelRoot "github.com/queeck/cli/internal/services/commands/models"
-	modelConfig "github.com/queeck/cli/internal/services/commands/models/config"
-	modelConfigView "github.com/queeck/cli/internal/services/commands/models/config/view"
 	"github.com/queeck/cli/internal/services/commands/selected"
 	configService "github.com/queeck/cli/internal/services/config"
 	serviceState "github.com/queeck/cli/internal/services/state"
@@ -21,6 +19,7 @@ type Service struct {
 	templates templates
 	config    config
 	routes    map[string]commands.Command
+	window    *window
 }
 
 func New(
@@ -99,10 +98,22 @@ func (s *Service) CommandRoot() commands.Command {
 	return s.routes[makeRoute(modelRoot.Code)]
 }
 
-func (s *Service) CommandConfig() commands.Command {
-	return s.routes[makeRoute(modelRoot.Code, modelConfig.Code)]
+func (s *Service) ForEach(fn func(route string, command commands.Command) bool) {
+	for route, cmd := range s.routes {
+		if !fn(route, cmd) {
+			return
+		}
+	}
 }
 
-func (s *Service) CommandConfigView() commands.Command {
-	return s.routes[makeRoute(modelRoot.Code, modelConfig.Code, modelConfigView.Code)]
+func (s *Service) Window() commands.Window {
+	return s.window
+}
+
+func (s *Service) UpdateWindowSize(width, height int) {
+	// used for viewport
+	s.window = &window{
+		height: height,
+		width:  width,
+	}
 }

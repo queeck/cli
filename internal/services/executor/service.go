@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ type Executioner interface {
 	WithTimeout(timeout time.Duration) Executioner
 	WithWorkingDir(workingDir string) Executioner
 	Execute(command string) (result string, err error)
+	ExecuteContext(ctx context.Context, command string) (result string, err error)
 }
 
 type Executor struct {
@@ -51,24 +53,24 @@ func (e *Executor) WithWorkingDir(workingDir string) Executioner {
 func (e *Executor) Execute(command string) (result string, err error) {
 	base := cmd.NewCommand(command, e.options...)
 	if err = base.Execute(); err != nil {
-		if base.Executed() {
-			if stderr := base.Stderr(); stderr != "" {
-				err = fmt.Errorf("%w\n\n%s", err, stderr)
-			}
-		}
-		return "", err
+		return "", extractError(base, err)
 	}
 	return base.Combined(), nil
 }
 
-func Execute(command string, options ...Option) (result string, err error) {
-	return New(options...).Execute(command)
+func (e *Executor) ExecuteContext(ctx context.Context, command string) (result string, err error) {
+	base := cmd.NewCommand(command, e.options...)
+	if err = base.ExecuteContext(ctx); err != nil {
+		return "", extractError(base, err)
+	}
+	return base.Combined(), nil
 }
 
-func MustExecute(command string, options ...Option) string {
-	result, err := New(options...).Execute(command)
-	if err != nil {
-		panic(err)
+func extractError(command *cmd.Command, err error) error {
+	if command.Executed() {
+		if stderr := command.Stderr(); stderr != "" {
+			err = fmt.Errorf("%w\n\n%s", err, stderr)
+		}
 	}
-	return result
+	return err
 }

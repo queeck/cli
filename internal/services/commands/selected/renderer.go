@@ -75,7 +75,7 @@ func transpose(entriesMatrix [][]Entry) [][]Entry {
 		transposed[i] = make([]Entry, maxSide)
 	}
 
-	for i := range len(entriesMatrix) {
+	for i := range entriesMatrix {
 		for j := range len(entriesMatrix[i]) {
 			transposed[j][i] = entriesMatrix[i][j]
 		}
