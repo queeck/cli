@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -22,8 +21,8 @@ func TestExecutor_Execute(t *testing.T) {
 		var result string
 		result, err = New().Execute(`cd`)
 		require.NoError(t, err)
-		require.True(t, strings.HasSuffix(result, currentDirectory+"\r\n"),
-			fmt.Sprintf("expected path to current directory, got: %s", result))
+		require.Truef(t, strings.HasSuffix(result, currentDirectory+"\r\n"),
+			"expected path to current directory, got: %s", result)
 	})
 
 	t.Run("get current directory on linux", func(t *testing.T) {
@@ -33,8 +32,8 @@ func TestExecutor_Execute(t *testing.T) {
 		var result string
 		result, err = New().Execute(`pwd`)
 		require.NoError(t, err)
-		require.True(t, strings.HasSuffix(result, currentDirectory+"\n"),
-			fmt.Sprintf("expected path to current directory, got: %s", result))
+		require.Truef(t, strings.HasSuffix(result, currentDirectory+"\n"),
+			"expected path to current directory, got: %s", result)
 	})
 
 	t.Run("get current directory on darwin", func(t *testing.T) {
@@ -44,7 +43,7 @@ func TestExecutor_Execute(t *testing.T) {
 		var result string
 		result, err = New().Execute(`pwd`)
 		require.NoError(t, err)
-		require.True(t, strings.HasSuffix(result, currentDirectory+"\n"),
-			fmt.Sprintf("expected path to current directory, got: %s", result))
+		require.Truef(t, strings.HasSuffix(result, currentDirectory+"\n"),
+			"expected path to current directory, got: %s", result)
 	})
 }
